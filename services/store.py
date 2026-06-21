@@ -1,8 +1,8 @@
-import numpy as np
-import hashlib
-import time
-from typing import List, Dict, Any, Optional
+import uuid
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 
 
 @dataclass
@@ -43,7 +43,12 @@ class VectorStore:
         self.chunks = [c for c in self.chunks if c.doc_id != doc_id]
         return True
 
-    def search(self, query_embedding: np.ndarray, top_k: int = 5, doc_ids: Optional[List[str]] = None) -> List[Dict]:
+    def search(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int = 5,
+        doc_ids: Optional[List[str]] = None,
+    ) -> List[Dict]:
         candidates = self.chunks
         if doc_ids:
             candidates = [c for c in candidates if c.doc_id in doc_ids]
@@ -70,15 +75,17 @@ class VectorStore:
         results = []
         for idx in top_indices:
             c = candidates[idx]
-            results.append({
-                "chunk_id": c.id,
-                "doc_id": c.doc_id,
-                "doc_name": c.doc_name,
-                "doc_type": c.doc_type,
-                "text": c.text,
-                "score": float(scores[idx]),
-                "metadata": c.metadata,
-            })
+            results.append(
+                {
+                    "chunk_id": c.id,
+                    "doc_id": c.doc_id,
+                    "doc_name": c.doc_name,
+                    "doc_type": c.doc_type,
+                    "text": c.text,
+                    "score": float(scores[idx]),
+                    "metadata": c.metadata,
+                }
+            )
         return results
 
     def list_documents(self) -> List[Document]:
@@ -93,7 +100,7 @@ class VectorStore:
 
 
 def make_doc_id(name: str) -> str:
-    return hashlib.md5(f"{name}{time.time()}".encode()).hexdigest()[:12]
+    return uuid.uuid4().hex[:12]
 
 
 def make_chunk_id(doc_id: str, idx: int) -> str:

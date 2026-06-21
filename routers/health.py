@@ -1,8 +1,11 @@
-from fastapi import APIRouter
-from services.store import store
 import os
 
+from fastapi import APIRouter
+
+from services.store import store
+
 router = APIRouter()
+
 
 @router.get("/health", tags=["Health"])
 def health():

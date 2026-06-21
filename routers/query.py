@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 from typing import List, Optional
 
-from services.store import store
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
 from services.embeddings import embed_query
 from services.llm import generate_answer
+from services.store import store
 
 router = APIRouter()
 
@@ -23,13 +24,17 @@ class QueryResponse(BaseModel):
     chunks: Optional[List[dict]] = None
 
 
-@router.post("/", response_model=QueryResponse, summary="Ask a question over your documents")
+@router.post(
+    "/", response_model=QueryResponse, summary="Ask a question over your documents"
+)
 async def query(req: QueryRequest):
     if not req.question.strip():
         raise HTTPException(400, "Question cannot be empty.")
 
     if store.get_stats()["chunk_count"] == 0:
-        raise HTTPException(422, "No documents ingested yet. Upload some documents first.")
+        raise HTTPException(
+            422, "No documents ingested yet. Upload some documents first."
+        )
 
     query_emb = await embed_query(req.question)
     chunks = store.search(query_emb, top_k=req.top_k, doc_ids=req.doc_ids)

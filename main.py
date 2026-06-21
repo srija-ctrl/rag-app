@@ -1,10 +1,12 @@
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from routers import documents, query, health
-import os
+
+from routers import documents, health, query
 
 app = FastAPI(
     title="RAG API",
@@ -26,12 +28,12 @@ app.include_router(query.router, prefix="/api/query", tags=["Query"])
 
 
 @app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+async def http_exception_handler(_request: Request, exc: StarletteHTTPException):
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 
 @app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
+async def generic_exception_handler(_request: Request, exc: Exception):
     return JSONResponse({"detail": str(exc)}, status_code=500)
 
 

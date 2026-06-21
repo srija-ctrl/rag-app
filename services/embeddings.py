@@ -4,9 +4,11 @@ Fast, cheap (~$0.00002/1K tokens), 1536 dims, great semantic quality.
 """
 
 import os
-import numpy as np
-import httpx
 from typing import List
+
+import httpx
+import numpy as np
+from sklearn.feature_extraction.text import HashingVectorizer
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 EMBED_MODEL = "text-embedding-3-small"
@@ -22,10 +24,13 @@ async def embed_texts(texts: List[str]) -> List[np.ndarray]:
     results = []
     async with httpx.AsyncClient(timeout=60) as client:
         for i in range(0, len(texts), BATCH_SIZE):
-            batch = texts[i: i + BATCH_SIZE]
+            batch = texts[i : i + BATCH_SIZE]
             resp = await client.post(
                 "https://api.openai.com/v1/embeddings",
-                headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
                 json={"model": EMBED_MODEL, "input": batch},
             )
             resp.raise_for_status()
@@ -40,7 +45,10 @@ async def embed_query(text: str) -> np.ndarray:
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
             "https://api.openai.com/v1/embeddings",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
             json={"model": EMBED_MODEL, "input": [text]},
         )
         resp.raise_for_status()
@@ -48,15 +56,19 @@ async def embed_query(text: str) -> np.ndarray:
 
 
 # ── TF-IDF fallback (no key) ──────────────────────────────────────────────────
-from sklearn.feature_extraction.text import HashingVectorizer
+
 _vectorizer = HashingVectorizer(
     n_features=EMBED_DIM,
     ngram_range=(1, 2),
     alternate_sign=False,
-    norm='l2',
+    norm="l2",
     binary=False,
 )
 
+
 def _tfidf_fallback(texts: List[str]) -> List[np.ndarray]:
     rows = _vectorizer.transform(texts)
-    return [np.asarray(rows[i].toarray(), dtype=np.float32).flatten() for i in range(rows.shape[0])]
+    return [
+        np.asarray(rows[i].toarray(), dtype=np.float32).flatten()
+        for i in range(rows.shape[0])
+    ]

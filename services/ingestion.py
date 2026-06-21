@@ -1,8 +1,8 @@
 import io
 import re
-import time
-import httpx
 from typing import List, Tuple
+
+import httpx
 
 # PDF
 import pypdf
@@ -10,13 +10,16 @@ import pypdf
 # DOCX
 from docx import Document as DocxDocument
 
-CHUNK_SIZE = 800     # characters per chunk
+CHUNK_SIZE = 800  # characters per chunk
 CHUNK_OVERLAP = 150  # overlap between chunks
 
 
 # ── Text splitter ──────────────────────────────────────────────────────────────
 
-def split_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
+
+def split_text(
+    text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP
+) -> List[str]:
     """Split text into overlapping chunks, respecting sentence/paragraph boundaries."""
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if len(text) <= chunk_size:
@@ -44,6 +47,7 @@ def split_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
 
 # ── Extractors ─────────────────────────────────────────────────────────────────
 
+
 def extract_pdf(data: bytes) -> str:
     reader = pypdf.PdfReader(io.BytesIO(data))
     pages = []
@@ -60,7 +64,9 @@ def extract_docx(data: bytes) -> str:
     # Also grab table cells
     for table in doc.tables:
         for row in table.rows:
-            row_text = " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
+            row_text = " | ".join(
+                cell.text.strip() for cell in row.cells if cell.text.strip()
+            )
             if row_text:
                 paragraphs.append(row_text)
     return "\n\n".join(paragraphs)
@@ -83,10 +89,16 @@ async def extract_url(url: str) -> Tuple[str, str]:
 
     # Simple HTML text extraction without extra deps
     # Strip scripts, styles, tags
-    html = re.sub(r"<script[^>]*>.*?</script>", " ", html, flags=re.DOTALL | re.IGNORECASE)
-    html = re.sub(r"<style[^>]*>.*?</style>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(
+        r"<script[^>]*>.*?</script>", " ", html, flags=re.DOTALL | re.IGNORECASE
+    )
+    html = re.sub(
+        r"<style[^>]*>.*?</style>", " ", html, flags=re.DOTALL | re.IGNORECASE
+    )
 
-    title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+    title_match = re.search(
+        r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL
+    )
     title = re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else url
 
     # Convert block tags to newlines
@@ -94,7 +106,14 @@ async def extract_url(url: str) -> Tuple[str, str]:
     # Strip remaining tags
     text = re.sub(r"<[^>]+>", " ", html)
     # Decode common entities
-    for ent, ch in [("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&nbsp;", " "), ("&#39;", "'"), ("&quot;", '"')]:
+    for ent, ch in [
+        ("&amp;", "&"),
+        ("&lt;", "<"),
+        ("&gt;", ">"),
+        ("&nbsp;", " "),
+        ("&#39;", "'"),
+        ("&quot;", '"'),
+    ]:
         text = text.replace(ent, ch)
     text = re.sub(r" {2,}", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)

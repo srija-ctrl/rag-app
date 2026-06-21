@@ -18,13 +18,13 @@ export OPENAI_API_KEY=sk-...
 uvicorn main:app --reload --port 8000
 ```
 
-- UI → http://localhost:8000  
+- UI → http://localhost:8000
 - API docs → http://localhost:8000/docs
 
 ## Deploy to Render (free tier)
 
 1. Push folder to GitHub
-2. render.com → **New Web Service** → connect repo  
+2. render.com → **New Web Service** → connect repo
    (Render reads `render.yaml` automatically)
 3. Environment tab → add `OPENAI_API_KEY`
 4. Deploy → live in ~2 min

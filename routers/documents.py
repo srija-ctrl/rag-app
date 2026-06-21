@@ -1,11 +1,18 @@
 import time
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from typing import Optional
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from services.store import store, Document, Chunk, make_doc_id, make_chunk_id
-from services.ingestion import extract_pdf, extract_docx, extract_text, extract_url, split_text
 from services.embeddings import embed_texts
+from services.ingestion import (
+    extract_docx,
+    extract_pdf,
+    extract_text,
+    extract_url,
+    split_text,
+)
+from services.store import Chunk, Document, make_chunk_id, make_doc_id, store
 
 router = APIRouter()
 
@@ -31,7 +38,9 @@ async def upload_file(file: UploadFile = File(...)):
         text = extract_text(data)
         doc_type = "text"
     else:
-        raise HTTPException(400, f"Unsupported file type: .{ext}. Use PDF, DOCX, TXT, or MD.")
+        raise HTTPException(
+            400, f"Unsupported file type: .{ext}. Use PDF, DOCX, TXT, or MD."
+        )
 
     if not text.strip():
         raise HTTPException(422, "Could not extract any text from the file.")
@@ -80,6 +89,7 @@ def delete_document(doc_id: str):
 
 
 # ── Internal helper ─────────────────────────────────────────────────────────────
+
 
 async def _ingest(text: str, name: str, doc_type: str, metadata: dict = None) -> dict:
     chunks_text = split_text(text)
