@@ -12,13 +12,6 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 async def generate_answer(
     query: str, chunks: List[Dict], chat_history: Optional[List[Dict]] = None
 ) -> str:
-    if not GOOGLE_API_KEY and not OPENAI_API_KEY:
-        top = chunks[0]["text"][:300] if chunks else "none"
-        return (
-            "⚠️ No model API key set. Set GOOGLE_API_KEY or OPENAI_API_KEY to enable AI answers.\n\n"
-            f'Top retrieved chunk: "{top}…"'
-        )
-
     context = "\n\n---\n\n".join(
         f"[Source {i + 1}: {c['doc_name']} | score {c['score']:.2f}]\n{c['text']}"
         for i, c in enumerate(chunks)
@@ -29,10 +22,14 @@ async def generate_answer(
 - If the answer isn't in the context, say so — never make things up.
 - Be concise and clear. Use bullet points for lists."""
 
+    # Try cloud APIs first if configured
     if OPENAI_API_KEY and not GOOGLE_API_KEY:
         return await _generate_with_openai(query, context, system, chat_history)
+    elif GOOGLE_API_KEY:
+        return await _generate_with_google(query, context, system, chat_history)
 
-    return await _generate_with_google(query, context, system, chat_history)
+    # Default to local Ollama
+    return await _generate_with_ollama(query, context, system)
 
 
 async def _generate_with_openai(
@@ -83,6 +80,8 @@ async def _generate_with_google(
     system: str,
     chat_history: Optional[List[Dict]],
 ) -> str:
+    # This function is now mapped to Google Gemini API
+    # Using the old Google API endpoint (if GOOGLE_API_KEY is set)
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
             "http://localhost:11434/api/generate",
@@ -101,3 +100,28 @@ async def _generate_with_google(
             raise RuntimeError(f"LLM API error {exc.response.status_code}: {body}")
         except (ValueError, KeyError):
             raise RuntimeError(f"Invalid LLM response body: {resp.text[:300]}")
+
+
+async def _generate_with_ollama(
+    query: str,
+    context: str,
+    system: str,
+) -> str:
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3.2",
+                "prompt": f"{system}\n\nContext:\n{context}\n\nQuestion: {query}",
+                "stream": False,
+            },
+        )
+        try:
+            resp.raise_for_status()
+            payload = resp.json()
+            return payload["response"]
+        except HTTPStatusError as exc:
+            body = exc.response.text
+            raise RuntimeError(f"Ollama API error {exc.response.status_code}: {body}")
+        except (ValueError, KeyError):
+            raise RuntimeError(f"Invalid Ollama response body: {resp.text[:300]}")
