@@ -7,7 +7,6 @@ from httpx import HTTPStatusError
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-MODEL = "gemini-2.0-flash"
 
 
 async def generate_answer(
@@ -84,35 +83,19 @@ async def _generate_with_google(
     system: str,
     chat_history: Optional[List[Dict]],
 ) -> str:
-    contents = []
-    for turn in (chat_history or [])[-6:]:
-        role = "user" if turn.get("role") == "user" else "model"
-        contents.append({"role": role, "parts": [{"text": turn.get("content", "")}]})
-    contents.append(
-        {
-            "role": "user",
-            "parts": [
-                {
-                    "text": f"Context:\n\n{context}\n\n---\n\nQuestion: {query}",
-                }
-            ],
-        }
-    )
-
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={GOOGLE_API_KEY}",
-            headers={"Content-Type": "application/json"},
+            "http://localhost:11434/api/generate",
             json={
-                "system_instruction": {"parts": [{"text": system}]},
-                "contents": contents,
-                "generationConfig": {"maxOutputTokens": 1024},
+                "model": "llama3.2",
+                "prompt": f"{system}\n\nContext:\n{context}\n\nQuestion: {query}",
+                "stream": False,
             },
         )
         try:
             resp.raise_for_status()
             payload = resp.json()
-            return payload["candidates"][0]["content"]["parts"][0]["text"]
+            return payload["response"]
         except HTTPStatusError as exc:
             body = exc.response.text
             raise RuntimeError(f"LLM API error {exc.response.status_code}: {body}")
