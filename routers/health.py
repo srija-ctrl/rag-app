@@ -1,19 +1,18 @@
-import os
-
 from fastapi import APIRouter
 
 from services.store import store
+
+DEFAULT_LLAMA_MODEL = "llama3.2"
+DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
 
 router = APIRouter()
 
 
 @router.get("/health", tags=["Health"])
 def health():
-    key_set = bool(os.environ.get("GOOGLE_API_KEY"))
     return {
         "status": "ok",
-        "google_key_set": key_set,
-        "llm_model": "gemini-1.5-flash",
-        "embedding_model": "tfidf-local",
+        "llm_model": DEFAULT_LLAMA_MODEL,
+        "embedding_model": DEFAULT_EMBEDDING_MODEL,
         **store.get_stats(),
     }

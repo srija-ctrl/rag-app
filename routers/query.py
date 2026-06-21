@@ -1,27 +1,11 @@
-from typing import List, Optional
-
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
+from models import QueryRequest, QueryResponse
 from services.embeddings import embed_query
 from services.llm import generate_answer
 from services.store import store
 
 router = APIRouter()
-
-
-class QueryRequest(BaseModel):
-    question: str
-    top_k: int = 5
-    doc_ids: Optional[List[str]] = None  # filter to specific docs
-    chat_history: Optional[List[dict]] = None  # [{role, content}, ...]
-    return_chunks: bool = False
-
-
-class QueryResponse(BaseModel):
-    answer: str
-    sources: List[dict]
-    chunks: Optional[List[dict]] = None
 
 
 @router.post(
@@ -46,7 +30,11 @@ async def query(req: QueryRequest):
         )
 
     try:
-        answer = await generate_answer(req.question, chunks, req.chat_history)
+        answer = await generate_answer(
+            req.question,
+            chunks,
+            chat_history=req.chat_history,
+        )
     except Exception as exc:
         raise HTTPException(500, detail=str(exc))
 

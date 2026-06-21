@@ -1,118 +1,55 @@
-import os
+"""LLM service using local Ollama."""
+
 from typing import Dict, List, Optional
 
 import httpx
 from httpx import HTTPStatusError
 
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+DEFAULT_LLAMA_MODEL = "llama3.2"
 
 
 async def generate_answer(
-    query: str, chunks: List[Dict], chat_history: Optional[List[Dict]] = None
+    query: str,
+    chunks: List[Dict],
+    model: Optional[str] = None,
+    chat_history: Optional[List[Dict]] = None,
 ) -> str:
+    """Generate an answer using local Ollama."""
     context = "\n\n---\n\n".join(
         f"[Source {i + 1}: {c['doc_name']} | score {c['score']:.2f}]\n{c['text']}"
         for i, c in enumerate(chunks)
     )
 
     system = """You are a helpful RAG assistant. Answer questions using only the provided document context.
-- Cite the source document name when relevant (e.g. \"According to report.pdf…\").
+- Cite the source document name when relevant (e.g. "According to report.pdf…").
 - If the answer isn't in the context, say so — never make things up.
 - Be concise and clear. Use bullet points for lists."""
 
-    # Try cloud APIs first if configured
-    if OPENAI_API_KEY and not GOOGLE_API_KEY:
-        return await _generate_with_openai(query, context, system, chat_history)
-    elif GOOGLE_API_KEY:
-        return await _generate_with_google(query, context, system, chat_history)
+    if not model:
+        model = DEFAULT_LLAMA_MODEL
 
-    # Default to local Ollama
-    return await _generate_with_ollama(query, context, system)
+    history_text = ""
+    if chat_history:
+        history_lines = []
+        for turn in chat_history[-6:]:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            history_lines.append(f"{role.capitalize()}: {content}")
+        if history_lines:
+            history_text = "\n\nChat history:\n" + "\n".join(history_lines)
 
-
-async def _generate_with_openai(
-    query: str,
-    context: str,
-    system: str,
-    chat_history: Optional[List[Dict]],
-) -> str:
-    messages = [{"role": "system", "content": system}]
-    for turn in (chat_history or [])[-6:]:
-        role = "user" if turn.get("role") == "user" else "assistant"
-        messages.append({"role": role, "content": turn.get("content", "")})
-
-    messages.append(
-        {
-            "role": "user",
-            "content": f"Context:\n\n{context}\n\n---\n\nQuestion: {query}",
-        }
-    )
-
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": OPENAI_MODEL,
-                "messages": messages,
-                "max_tokens": 1024,
-            },
-        )
-        try:
-            resp.raise_for_status()
-            payload = resp.json()
-            return payload["choices"][0]["message"]["content"]
-        except HTTPStatusError as exc:
-            body = exc.response.text
-            raise RuntimeError(f"OpenAI API error {exc.response.status_code}: {body}")
-        except (ValueError, KeyError):
-            raise RuntimeError(f"Invalid OpenAI response body: {resp.text[:300]}")
+    prompt = f"{system}\n\nContext:\n{context}\n\nQuestion: {query}{history_text}"
+    return await _generate_with_ollama(prompt, model)
 
 
-async def _generate_with_google(
-    query: str,
-    context: str,
-    system: str,
-    chat_history: Optional[List[Dict]],
-) -> str:
-    # This function is now mapped to Google Gemini API
-    # Using the old Google API endpoint (if GOOGLE_API_KEY is set)
+async def _generate_with_ollama(prompt: str, model: str) -> str:
+    """Generate response using local Ollama."""
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": "llama3.2",
-                "prompt": f"{system}\n\nContext:\n{context}\n\nQuestion: {query}",
-                "stream": False,
-            },
-        )
-        try:
-            resp.raise_for_status()
-            payload = resp.json()
-            return payload["response"]
-        except HTTPStatusError as exc:
-            body = exc.response.text
-            raise RuntimeError(f"LLM API error {exc.response.status_code}: {body}")
-        except (ValueError, KeyError):
-            raise RuntimeError(f"Invalid LLM response body: {resp.text[:300]}")
-
-
-async def _generate_with_ollama(
-    query: str,
-    context: str,
-    system: str,
-) -> str:
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "llama3.2",
-                "prompt": f"{system}\n\nContext:\n{context}\n\nQuestion: {query}",
+                "model": model,
+                "prompt": prompt,
                 "stream": False,
             },
         )
