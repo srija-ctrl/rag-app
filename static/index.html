@@ -112,10 +112,12 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg);
 .send-btn:hover { background: var(--purple-dark); }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.progress-overlay { position: fixed; bottom: 80px; right: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); display: none; gap: 8px; align-items: center; z-index: 100; }
-.progress-overlay.show { display: flex; }
-.spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--purple); border-radius: 50%; animation: spin 0.6s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+  .provider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .provider-row label { font-size: 13px; color: var(--text-muted); min-width: 96px; }
+  .provider-row select,
+  .provider-row input { flex: 1; height: 36px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 10px; background: var(--bg); color: var(--text); }
+  .provider-row input { font-family: inherit; }
+
 
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1a1a18; color: white; font-size: 13px; padding: 8px 16px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 200; }
 .toast.show { opacity: 1; }
@@ -128,7 +130,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg);
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
     RAG App
   </div>
-  <span class="topbar-badge">Python · FastAPI · Ollama</span>
+  <span class="topbar-badge">Python · FastAPI · Ollama / Gemini</span>
   <div class="topbar-right">
     <span class="status-dot" id="statusDot"></span>
     <span class="status-text" id="statusText">Connecting…</span>
@@ -173,6 +175,14 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg);
     </div>
 
     <div class="input-bar">
+      <div class="provider-row">
+        <label for="llmProvider">LLM provider</label>
+        <select id="llmProvider">
+          <option value="ollama">Ollama</option>
+          <option value="gemini">Gemini</option>
+        </select>
+        <input id="llmApiKey" type="password" placeholder="Gemini API key (optional)" />
+      </div>
       <div class="input-row">
         <textarea id="questionInput" placeholder="Ask a question about your documents…" rows="1"></textarea>
         <button class="send-btn" id="sendBtn" disabled>
@@ -208,6 +218,8 @@ const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
 const progressOverlay = document.getElementById('progressOverlay');
 const progressMsg = document.getElementById('progressMsg');
+const llmProvider = document.getElementById('llmProvider');
+const llmApiKey = document.getElementById('llmApiKey');
 
 // ── Health check ──────────────────────────────────────────────────────────────
 async function checkHealth() {
@@ -337,11 +349,26 @@ async function ask() {
 
   chatHistory.push({ role: 'user', content: q });
 
+  if (llmProvider.value === 'gemini' && !llmApiKey.value.trim()) {
+    toast('Gemini requires an API key. Enter it above or choose Ollama.', true);
+    aiEl.querySelector('.bubble').classList.remove('thinking');
+    aiEl.querySelector('.bubble').textContent = 'Please set a Gemini API key.';
+    isBusy = false;
+    sendBtn.disabled = false;
+    return;
+  }
+
   try {
     const r = await fetch(`${BASE}/api/query/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, top_k: 5, chat_history: chatHistory.slice(-8) }),
+      body: JSON.stringify({
+        question: q,
+        top_k: 5,
+        chat_history: chatHistory.slice(-8),
+        llm_provider: llmProvider.value,
+        llm_api_key: llmProvider.value === 'gemini' ? llmApiKey.value.trim() : undefined,
+      }),
     });
     const payload = await r.text();
     let d;
