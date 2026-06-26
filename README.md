@@ -1,4 +1,13 @@
-# RAG App — FastAPI + Ollama
+---
+title: RAG App
+emoji: 🚀
+colorFrom: purple
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
+# RAG App — FastAPI + Ollama + Gemini
 
 Retrieval-Augmented Generation over PDFs, DOCX, URLs, and text files using local Ollama.
 
