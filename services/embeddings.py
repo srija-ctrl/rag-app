@@ -1,13 +1,16 @@
-"""Ollama embedding service with TF-IDF fallback."""
+"""Embedding service supporting Google Gemini, Ollama, and TF-IDF."""
 
+import os
 from typing import List, Optional
 
 import httpx
 import numpy as np
+from google import genai
 from sklearn.feature_extraction.text import HashingVectorizer
 
-DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
-EMBEDDING_DIMS = {"ollama": 768}
+DEFAULT_OLLAMA_MODEL = "nomic-embed-text"
+DEFAULT_GEMINI_MODEL = "text-embedding-004"
+EMBEDDING_DIMS = {"ollama": 768, "gemini": 768}
 
 _tfidf_vectorizer = HashingVectorizer(
     n_features=EMBEDDING_DIMS["ollama"],
@@ -21,15 +24,18 @@ _tfidf_vectorizer = HashingVectorizer(
 async def embed_texts(
     texts: List[str], model: Optional[str] = None
 ) -> List[np.ndarray]:
-    """Embed texts using local Ollama or TF-IDF fallback."""
+    """Embed texts using Gemini, Ollama, or TF-IDF fallback."""
     if not texts:
         return []
 
     if not model:
-        model = DEFAULT_EMBEDDING_MODEL
+        model = DEFAULT_GEMINI_MODEL
 
     try:
-        return await _embed_with_ollama(texts, model)
+        if "gemini" in model or "embedding" in model:
+            return await _embed_with_gemini(texts, model)
+        else:
+            return await _embed_with_ollama(texts, model)
     except Exception:
         return _embed_with_tfidf(texts)
 
@@ -37,9 +43,21 @@ async def embed_texts(
 async def embed_query(text: str, model: Optional[str] = None) -> np.ndarray:
     """Embed a single query text."""
     results = await embed_texts([text], model=model)
+    if not model:
+        model = DEFAULT_GEMINI_MODEL
+    dim_key = "gemini" if "gemini" in model or "embedding" in model else "ollama"
     return (
-        results[0] if results else np.zeros(EMBEDDING_DIMS["ollama"], dtype=np.float32)
+        results[0] if results else np.zeros(EMBEDDING_DIMS[dim_key], dtype=np.float32)
     )
+
+async def _embed_with_gemini(texts: List[str], model: str) -> List[np.ndarray]:
+    """Embed texts using Google Gemini."""
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    response = await client.aio.models.embed_content(
+        model=model,
+        contents=texts,
+    )
+    return [np.array(e.values, dtype=np.float32) for e in response.embeddings]
 
 
 async def _embed_with_ollama(texts: List[str], model: str) -> List[np.ndarray]:

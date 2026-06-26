@@ -350,12 +350,7 @@ async function ask() {
   chatHistory.push({ role: 'user', content: q });
 
   if (llmProvider.value === 'gemini' && !llmApiKey.value.trim()) {
-    toast('Gemini requires an API key. Enter it above or choose Ollama.', true);
-    aiEl.querySelector('.bubble').classList.remove('thinking');
-    aiEl.querySelector('.bubble').textContent = 'Please set a Gemini API key.';
-    isBusy = false;
-    sendBtn.disabled = false;
-    return;
+    // Relying on backend environment variable if UI is empty
   }
 
   try {

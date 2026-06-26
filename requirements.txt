@@ -12,3 +12,5 @@ ruff
 pytest
 mypy
 uv
+google-genai
+python-dotenv
